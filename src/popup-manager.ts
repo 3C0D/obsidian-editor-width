@@ -1,5 +1,5 @@
-import { MarkdownView, setIcon } from 'obsidian';
-import type { App, WorkspaceLeaf, EditorPosition } from 'obsidian';
+import { MarkdownView, setIcon, ToggleComponent } from 'obsidian';
+import type { App, WorkspaceLeaf, EditorPosition, EventRef } from 'obsidian';
 import type { EditorWidthSettings } from './interfaces.ts';
 import {
   getLeafId,
@@ -211,9 +211,11 @@ export class PopupManager {
     };
     ownerDoc.addEventListener('keydown', onKeyDown);
 
+    let cssChangeRef: EventRef | null = null;
     // Cleanup logic for the popup destruction
     const cleanup = (): void => {
       ownerDoc.removeEventListener('keydown', onKeyDown);
+      if (cssChangeRef) this.app.workspace.offref(cssChangeRef);
     };
 
     lockBtn.addEventListener('click', (e) => {
@@ -240,10 +242,40 @@ export class PopupManager {
       this.guides.scheduleHide(2000);
     });
 
+    // Create the readable line length toggle row (reuses existing flex-row classes, no new CSS needed)
+    const readableRow = ownerDoc.createElement('div');
+    readableRow.classList.add('line-width-slider-header');
+
+    const readableLabel = ownerDoc.createElement('span');
+    readableLabel.classList.add('line-width-slider-label');
+    readableLabel.textContent = 'Readable line width';
+    readableLabel.setAttribute(
+      'aria-label',
+      'Toggle Obsidian\'s built-in "Readable line length" setting'
+    );
+
+    const toggleWrapper = ownerDoc.createElement('div');
+
+    const readableToggle = new ToggleComponent(toggleWrapper)
+      .setValue(Boolean(this.app.vault.getConfig('readableLineLength')))
+      .onChange((checked) => {
+        this.app.vault.setConfig('readableLineLength', checked);
+        // Trigger css-change so Obsidian re-applies the setting to all editors
+        this.app.workspace.trigger('css-change');
+      });
+
+    // Keep the toggle in sync if the user changes the setting from Obsidian's own settings panel
+    cssChangeRef = this.app.workspace.on('css-change', () => {
+      readableToggle.setValue(Boolean(this.app.vault.getConfig('readableLineLength')));
+    });
+
     headerRow.appendChild(label);
     headerRow.appendChild(lockBtn);
     popup.appendChild(headerRow);
     popup.appendChild(slider);
+    popup.appendChild(readableRow);
+    readableRow.appendChild(readableLabel);
+    readableRow.appendChild(toggleWrapper);
 
     updateLockState();
 

@@ -5,6 +5,7 @@ Control and customize the width of your editor in Obsidian with precision. This 
 ## Features
 
 - 📏 **Adjustable Editor Width** - Slider control to set custom width for your editor (300px - 1600px)
+- 📖 **Readable Line Width Toggle** - Quickly toggle Obsidian's "Readable line length" setting directly from the popup
 - 🔒 **Per-File Width Locking** - Set different widths for individual files or use a global default
 - 🎯 **Visual Width Guides** - Vertical guides show exactly where your editor boundaries are
 - 🎨 **Customizable Colors** - Change the icon and guide colors to match your theme
@@ -19,7 +20,8 @@ Control and customize the width of your editor in Obsidian with precision. This 
 2. Look for the **width icon** (↔) in the markdown tab header
 3. Click the icon to open the width adjustment popup
 4. Use the slider to adjust your desired editor width
-5. Click the **lock icon** to save this width for the current file
+5. Toggle **Readable line width** to switch between fixed width and Obsidian's default readable length mode
+6. Click the **lock icon** to save this width for the current file
 
 ### Width Modes
 
