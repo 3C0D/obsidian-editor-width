@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-sample-plugin-modif",
+  "name": "editor-width",
   "version": "1.0.0",
-  "description": "Modified Obsidian plugin template with integrated scripts",
+  "description": "Modify the width of the editor with an action slider.",
   "type": "module",
   "main": "src/index.ts",
   "license": "MIT",
@@ -39,7 +39,6 @@
     "dedent": "latest",
     "dotenv": "latest",
     "esbuild": "latest",
-    "fs-extra": "^11.2.0",
     "obsidian": "*",
     "obsidian-typings": "latest",
     "tsx": "^4.21.0",
@@ -54,8 +53,6 @@
     "tslib": "2.4.0"
   },
   "dependencies": {
-    "@types/lodash": "^4.17.17",
-    "lodash": "^4.17.21"
   },
   "engines": {
     "npm": "please-use-yarn",

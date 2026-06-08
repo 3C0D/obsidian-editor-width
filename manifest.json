@@ -1,9 +1,9 @@
 {
-  "id": "sample-plugin-modif",
-  "name": "Sample Plugin Modif",
+  "id": "editor-width",
+  "name": "Obsidian Editor Width",
   "version": "1.0.0",
   "minAppVersion": "1.8.9",
-  "description": "Modified Obsidian plugin template with integrated scripts",
+  "description": "Modify the width of the editor with an action slider.",
   "author": "3C0D",
   "authorUrl": "https://github.com/3C0D",
   "isDesktopOnly": false
