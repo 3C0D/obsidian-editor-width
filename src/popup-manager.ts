@@ -248,7 +248,7 @@ export class PopupManager {
 
     const readableLabel = ownerDoc.createElement('span');
     readableLabel.classList.add('line-width-slider-label');
-    readableLabel.textContent = 'Readable line width';
+    readableLabel.textContent = 'Readable line length';
     readableLabel.setAttribute(
       'aria-label',
       'Toggle Obsidian\'s built-in "Readable line length" setting'

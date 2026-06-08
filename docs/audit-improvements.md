@@ -36,6 +36,6 @@ This document summarizes the changes made to the Obsidian Editor Width plugin to
 - **Formatting**: Applied project-wide Prettier formatting and ESLint fixes.
 
 ## 6. Integrated Readable Line Length Control
-- **New Feature**: Added a "Readable line width" toggle directly in the control popup.
+- **New Feature**: Added a "Readable line length" toggle directly in the control popup.
 - **Why**: Allows users to quickly switch between their custom fixed width and Obsidian's built-in "Readable line length" setting without opening the main settings panel.
 - **Implementation**: Uses Obsidian's internal `vault.getConfig('readableLineLength')` and `vault.setConfig` for seamless integration. Includes automatic synchronization if the setting is changed elsewhere.
