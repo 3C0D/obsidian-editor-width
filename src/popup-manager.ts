@@ -1,0 +1,222 @@
+import { MarkdownView, setIcon } from 'obsidian';
+import type { App, WorkspaceLeaf, EditorPosition } from 'obsidian';
+import type { EditorWidthSettings } from './interfaces.ts';
+import {
+  getLeafId,
+  getFilePathForLeaf,
+  getWidthForLeafPath,
+  isFileLocked
+} from './leaf-utils.ts';
+import type { WidthManager } from './width-manager.ts';
+import type { WidthGuides } from './guides.ts';
+
+interface CursorState {
+  from: EditorPosition;
+  to: EditorPosition;
+}
+
+export class PopupManager {
+  private activePopup: { leafId: string; el: HTMLDivElement } | null = null;
+  private savedCursor: { leafId: string; state: CursorState } | null = null;
+
+  constructor(
+    private app: App,
+    private getSettings: () => EditorWidthSettings,
+    private saveData: (data: EditorWidthSettings) => Promise<void>,
+    private saveDebounced: () => void,
+    private widthManager: WidthManager,
+    private guides: WidthGuides,
+    private refreshLeafIcon: (leaf: WorkspaceLeaf) => void,
+    private setActiveLeaf: (leaf: WorkspaceLeaf, opts: { focus: boolean }) => void
+  ) {}
+
+  restoreCursor(leafId: string, leaf: WorkspaceLeaf): void {
+    if (!this.getSettings().restoreCursorOnClose) return;
+    const cursor = this.savedCursor?.leafId === leafId ? this.savedCursor.state : null;
+    if (!cursor) return;
+    this.setActiveLeaf(leaf, { focus: true });
+    const view = leaf.view instanceof MarkdownView ? leaf.view : null;
+    view?.editor?.setSelection(cursor.from, cursor.to);
+    this.savedCursor = null;
+  }
+
+  onDocumentClick(e: MouseEvent, leafIcons: Map<string, HTMLDivElement>): void {
+    if (!this.activePopup) return;
+    const clickDoc = (e.target as Node).ownerDocument;
+    const { leafId, el } = this.activePopup;
+    const icon = leafIcons.get(leafId);
+    if (!el.contains(e.target as Node) && !(icon && icon.contains(e.target as Node))) {
+      el.remove();
+      this.activePopup = null;
+      const leaf = this.findLeafById(leafId);
+      if (
+        leaf &&
+        leaf.containerEl.ownerDocument === clickDoc &&
+        leaf.containerEl.contains(e.target as Node)
+      ) {
+        this.restoreCursor(leafId, leaf);
+      }
+    }
+  }
+
+  private findLeafById(leafId: string): WorkspaceLeaf | null {
+    let found: WorkspaceLeaf | null = null;
+    this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      if (getLeafId(leaf) === leafId) found = leaf;
+    });
+    return found;
+  }
+
+  private toggleLock(
+    leaf: WorkspaceLeaf,
+    filePath: string | null,
+    updateLockState: () => void
+  ): void {
+    if (!filePath) return;
+    const s = this.getSettings();
+    if (isFileLocked(filePath, s)) {
+      delete s.localWidths[filePath];
+      void this.saveData(s);
+      this.widthManager.applyWidthToLeaf(leaf, s.lineWidthPx);
+    } else {
+      s.localWidths[filePath] = s.lineWidthPx;
+      void this.saveData(s);
+    }
+    updateLockState();
+  }
+
+  private guidesUpdateScheduled = false;
+  private scheduleGuidesUpdate(leaf: WorkspaceLeaf): void {
+    if (this.guidesUpdateScheduled) return;
+    this.guidesUpdateScheduled = true;
+    requestAnimationFrame(() => {
+      this.guides.showWidthGuidesForLeaf(leaf);
+      this.guidesUpdateScheduled = false;
+    });
+  }
+
+  togglePopupForLeaf(leaf: WorkspaceLeaf, iconEl: HTMLDivElement): void {
+    const leafId = getLeafId(leaf);
+    const existing =
+      this.activePopup && this.activePopup.leafId === leafId ? this.activePopup.el : null;
+    if (existing) {
+      existing.remove();
+      this.activePopup = null;
+    } else {
+      this.showPopupForLeaf(leaf, iconEl);
+    }
+  }
+
+  showPopupForLeaf(leaf: WorkspaceLeaf, iconEl: HTMLDivElement): void {
+    const leafId = getLeafId(leaf);
+
+    const view = leaf.view instanceof MarkdownView ? leaf.view : null;
+    const editor = view?.editor;
+    if (editor) {
+      this.savedCursor = {
+        leafId,
+        state: {
+          from: editor.getCursor('anchor'),
+          to: editor.getCursor('head')
+        }
+      };
+    }
+
+    if (this.activePopup && this.activePopup.leafId !== leafId) {
+      this.activePopup.el.remove();
+      this.activePopup = null;
+    }
+
+    const filePath = getFilePathForLeaf(leaf);
+    const ownerDoc = iconEl.ownerDocument;
+    const ownerWin = ownerDoc.defaultView;
+    if (!ownerWin) return;
+
+    const popup = ownerDoc.createElement('div');
+    popup.classList.add('line-width-slider-popup');
+
+    const headerRow = ownerDoc.createElement('div');
+    headerRow.classList.add('line-width-slider-header');
+
+    const label = ownerDoc.createElement('div');
+    label.classList.add('line-width-slider-label');
+
+    const lockBtn = ownerDoc.createElement('button');
+    lockBtn.classList.add('line-width-lock-btn');
+
+    const slider = ownerDoc.createElement('input');
+    slider.type = 'range';
+    slider.min = '300';
+    slider.max = '1600';
+    slider.classList.add('line-width-slider');
+
+    const updateLockState = (): void => {
+      const settings = this.getSettings();
+      const width = getWidthForLeafPath(filePath, settings);
+      label.textContent = `${width}px`;
+      slider.value = `${width}`;
+      lockBtn.innerHTML = '';
+      if (isFileLocked(filePath, settings)) {
+        setIcon(lockBtn, 'lock');
+        lockBtn.style.color = 'var(--interactive-accent)';
+        lockBtn.setAttribute('aria-label', 'Local width (this file only)');
+      } else {
+        setIcon(lockBtn, 'unlock');
+        lockBtn.style.color = 'var(--text-muted)';
+        lockBtn.setAttribute('aria-label', 'Global width (all files)');
+      }
+      this.refreshLeafIcon(leaf);
+    };
+
+    lockBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleLock(leaf, filePath, updateLockState);
+    });
+
+    slider.addEventListener('input', () => {
+      const value = parseInt(slider.value, 10);
+      label.textContent = `${value}px`;
+      const s = this.getSettings();
+      if (isFileLocked(filePath, s)) {
+        if (filePath) s.localWidths[filePath] = value;
+        this.widthManager.applyWidthToLeaf(leaf, value);
+      } else {
+        s.lineWidthPx = value;
+        this.widthManager.applyLineWidth();
+      }
+      this.saveDebounced();
+      this.refreshLeafIcon(leaf);
+      this.scheduleGuidesUpdate(leaf);
+      this.guides.scheduleHide(2000);
+    });
+
+    headerRow.appendChild(label);
+    headerRow.appendChild(lockBtn);
+    popup.appendChild(headerRow);
+    popup.appendChild(slider);
+
+    updateLockState();
+
+    const rect = iconEl.getBoundingClientRect();
+    popup.style.position = 'fixed';
+    popup.style.top = `${rect.bottom + 5}px`;
+    popup.style.right = `${ownerWin.innerWidth - rect.right}px`;
+
+    ownerDoc.body.appendChild(popup);
+    this.activePopup = { leafId, el: popup };
+  }
+
+  closePopupForLeaf(leafId: string): void {
+    if (this.activePopup?.leafId === leafId) {
+      this.activePopup.el.remove();
+      this.activePopup = null;
+    }
+  }
+
+  cleanup(): void {
+    if (this.activePopup) {
+      this.closePopupForLeaf(this.activePopup.leafId);
+    }
+    this.savedCursor = null;
+  }
+}
