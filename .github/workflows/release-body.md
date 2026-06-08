@@ -1,1 +1,1 @@
-New version. perf mem optimization. whole audit
+"Readable line length" obsidian setting added to the modal
