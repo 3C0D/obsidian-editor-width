@@ -10,6 +10,10 @@ export class WidthGuides {
     private getFilePathForLeaf: (leaf: WorkspaceLeaf) => string | null
   ) {}
 
+  /**
+   * Shows vertical visual guides to indicate where the editor margins are.
+   * Useful when adjusting the slider to see the impact in real-time.
+   */
   showWidthGuidesForLeaf(leaf: WorkspaceLeaf): void {
     this.hideWidthGuides();
 
@@ -18,6 +22,7 @@ export class WidthGuides {
     const px = this.getWidthForLeafPath(filePath);
     const containerEl = leaf.containerEl as HTMLElement;
 
+    // Handle Reading View
     const readingContainer = containerEl.querySelector(
       '.markdown-reading-view'
     ) as HTMLElement | null;
@@ -43,6 +48,7 @@ export class WidthGuides {
       return;
     }
 
+    // Handle Live Preview / Editing View
     const contentEl = containerEl.querySelector('.cm-sizer') as HTMLElement | null;
     if (!contentEl) return;
     if (contentEl.offsetParent === null) return;
@@ -73,12 +79,18 @@ export class WidthGuides {
     this.rightGuide = null;
   }
 
+  /**
+   * Smoothly fades out the guides using CSS transitions.
+   */
   fadeOutWidthGuides(): void {
     if (this.leftGuide) this.leftGuide.classList.add('line-width-guide-fade');
     if (this.rightGuide) this.rightGuide.classList.add('line-width-guide-fade');
     setTimeout(() => this.hideWidthGuides(), 500);
   }
 
+  /**
+   * Schedules the guides to hide after a delay.
+   */
   scheduleHide(delay: number): void {
     if (this.guideTimeout) clearTimeout(this.guideTimeout);
     this.guideTimeout = setTimeout(() => this.fadeOutWidthGuides(), delay);

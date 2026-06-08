@@ -16,6 +16,9 @@ export default class EditorWidthPlugin extends Plugin {
   popupManager!: PopupManager;
   leafIconManager!: LeafIconManager;
 
+  /**
+   * Debounced save function to prevent excessive disk I/O when the slider is moved rapidly.
+   */
   saveDebounced = debounce(
     async () => {
       await this.saveData(this.settings);
@@ -28,6 +31,9 @@ export default class EditorWidthPlugin extends Plugin {
     await this.loadSettings();
     this.addSettingTab(new Settings(this.app, this));
 
+    // Create a style element in the document head to host our global CSS overrides.
+    // This allows us to apply width constraints that persist even when Obsidian
+    // recreates internal editor components.
     this.lineWidthStyleEl = document.createElement('style');
     document.head.appendChild(this.lineWidthStyleEl);
 
@@ -62,6 +68,7 @@ export default class EditorWidthPlugin extends Plugin {
 
     this.leafIconManager.setPopupManager(this.popupManager);
 
+    // Watch for layout changes (e.g., opening new panes) to inject icons and update widths
     this.registerEvent(
       this.app.workspace.on('layout-change', () => {
         this.widthManager.updateEditorWidths();
@@ -69,6 +76,7 @@ export default class EditorWidthPlugin extends Plugin {
       })
     );
 
+    // Watch for active tab changes to ensure icons and widths are synced for the current file
     this.registerEvent(
       this.app.workspace.on('active-leaf-change', () => {
         this.widthManager.updateEditorWidths();
@@ -76,6 +84,7 @@ export default class EditorWidthPlugin extends Plugin {
       })
     );
 
+    // Global click listener to handle closing the width popup when clicking outside
     this.registerDomEvent(document, 'click', (e) =>
       this.popupManager.onDocumentClick(e, this.leafIconManager.getLeafIcons())
     );
@@ -93,6 +102,9 @@ export default class EditorWidthPlugin extends Plugin {
     this.widthManager.cleanupResizeObserver();
   }
 
+  /**
+   * Loads plugin settings and ensures the localWidths object is initialized.
+   */
   async loadSettings(): Promise<void> {
     this.settings = {
       ...DEFAULT_SETTINGS,
@@ -101,6 +113,9 @@ export default class EditorWidthPlugin extends Plugin {
     if (!this.settings.localWidths) this.settings.localWidths = {};
   }
 
+  /**
+   * Saves settings and triggers a UI refresh across all leaves.
+   */
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
     this.widthManager.applyLineWidth();

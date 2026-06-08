@@ -34,6 +34,9 @@ export class PopupManager {
     private setActiveLeaf: (leaf: WorkspaceLeaf, opts: { focus: boolean }) => void
   ) {}
 
+  /**
+   * Restores the editor cursor and selection to where they were before the popup was opened.
+   */
   restoreCursor(leafId: string, leaf: WorkspaceLeaf): void {
     if (!this.getSettings().restoreCursorOnClose) return;
     const cursor = this.savedCursor?.leafId === leafId ? this.savedCursor.state : null;
@@ -44,16 +47,22 @@ export class PopupManager {
     this.savedCursor = null;
   }
 
+  /**
+   * Handles clicks outside the popup to close it.
+   * This is registered as a global document listener.
+   */
   onDocumentClick(e: MouseEvent, leafIcons: Map<string, HTMLDivElement>): void {
     if (!this.activePopup) return;
     const clickDoc = (e.target as Node).ownerDocument;
     const { leafId, el, cleanup } = this.activePopup;
     const icon = leafIcons.get(leafId);
+    // If click is not inside the popup and not on the icon itself, close it.
     if (!el.contains(e.target as Node) && !(icon && icon.contains(e.target as Node))) {
       el.remove();
       if (cleanup) cleanup();
       this.activePopup = null;
       const leaf = this.findLeafById(leafId);
+      // If we clicked back into the editor area of the same tab, restore focus/cursor.
       if (
         leaf &&
         leaf.containerEl.ownerDocument === clickDoc &&
@@ -72,6 +81,10 @@ export class PopupManager {
     return found;
   }
 
+  /**
+   * Toggles the "Lock" state (local width) for the current file.
+   * If locked, changes to the slider only affect this file.
+   */
   private toggleLock(
     leaf: WorkspaceLeaf,
     filePath: string | null,
@@ -80,10 +93,12 @@ export class PopupManager {
     if (!filePath) return;
     const s = this.getSettings();
     if (isFileLocked(filePath, s)) {
+      // Unlock: Remove the local override and revert to global width
       delete s.localWidths[filePath];
       void this.saveData(s);
       this.widthManager.applyWidthToLeaf(leaf, s.lineWidthPx);
     } else {
+      // Lock: Create a local override starting with the current global width
       s.localWidths[filePath] = s.lineWidthPx;
       void this.saveData(s);
     }
@@ -91,6 +106,10 @@ export class PopupManager {
   }
 
   private guidesUpdateScheduled = false;
+  /**
+   * Updates the vertical width guides shown in the background while sliding.
+   * Uses requestAnimationFrame for smooth performance.
+   */
   private scheduleGuidesUpdate(leaf: WorkspaceLeaf): void {
     if (this.guidesUpdateScheduled) return;
     this.guidesUpdateScheduled = true;
@@ -111,9 +130,13 @@ export class PopupManager {
     }
   }
 
+  /**
+   * Creates and displays the width control popup near the icon.
+   */
   showPopupForLeaf(leaf: WorkspaceLeaf, iconEl: HTMLDivElement): void {
     const leafId = getLeafId(leaf);
 
+    // Save cursor position so we can restore it later
     const view = leaf.view instanceof MarkdownView ? leaf.view : null;
     const editor = view?.editor;
     if (editor) {
@@ -135,6 +158,7 @@ export class PopupManager {
     const ownerWin = ownerDoc.defaultView;
     if (!ownerWin) return;
 
+    // Create the popup elements
     const popup = ownerDoc.createElement('div');
     popup.classList.add('line-width-slider-popup');
 
@@ -153,6 +177,9 @@ export class PopupManager {
     slider.max = '1600';
     slider.classList.add('line-width-slider');
 
+    /**
+     * Refreshes the popup UI based on current settings (lock icon, label text).
+     */
     const updateLockState = (): void => {
       const settings = this.getSettings();
       const width = getWidthForLeafPath(filePath, settings);
@@ -171,6 +198,7 @@ export class PopupManager {
       this.refreshLeafIcon(leaf);
     };
 
+    // Close on Escape key
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -183,6 +211,7 @@ export class PopupManager {
     };
     ownerDoc.addEventListener('keydown', onKeyDown);
 
+    // Cleanup logic for the popup destruction
     const cleanup = (): void => {
       ownerDoc.removeEventListener('keydown', onKeyDown);
     };
@@ -197,9 +226,11 @@ export class PopupManager {
       label.textContent = `${value}px`;
       const s = this.getSettings();
       if (isFileLocked(filePath, s)) {
+        // Update local width only
         if (filePath) s.localWidths[filePath] = value;
         this.widthManager.applyWidthToLeaf(leaf, value);
       } else {
+        // Update global width
         s.lineWidthPx = value;
         this.widthManager.applyLineWidth();
       }
@@ -216,6 +247,7 @@ export class PopupManager {
 
     updateLockState();
 
+    // Position the popup below the icon
     const rect = iconEl.getBoundingClientRect();
     popup.style.position = 'fixed';
     popup.style.top = `${rect.bottom + 5}px`;

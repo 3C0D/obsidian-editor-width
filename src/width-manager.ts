@@ -19,14 +19,24 @@ export class WidthManager {
     );
   }
 
+  /**
+   * Applies a specific width to a leaf container using a CSS variable.
+   * This is used for "Local Width" (file-specific) settings.
+   */
   applyWidthToLeaf(leaf: WorkspaceLeaf, px: number): void {
     const containerEl = leaf.containerEl as HTMLElement;
     containerEl.style.setProperty('--editor-width', `${px}px`);
   }
 
+  /**
+   * Injects global CSS rules and applies the default editor width.
+   * Uses CSS variables to ensure styles persist during Obsidian view re-renders.
+   */
   applyLineWidth(): void {
     const settings = this.getSettings();
     if (settings.enableLineWidth) {
+      // We set --editor-width on .workspace-leaf as the default.
+      // Individual leaves can override this via their own containerEl styles (applyWidthToLeaf).
       this.lineWidthStyleEl.textContent =
         `.workspace-leaf { --editor-width: ${settings.lineWidthPx}px; }` +
         `.cm-contentContainer { max-width: unset !important; }` +
@@ -39,6 +49,7 @@ export class WidthManager {
     } else {
       this.lineWidthStyleEl.textContent = '';
       this.cleanupResizeObserver();
+      // Remove local overrides when the plugin or feature is disabled
       this.iterateAllLeaves((leaf) => {
         const containerEl = leaf.containerEl as HTMLElement;
         containerEl.style.removeProperty('--editor-width');
@@ -46,6 +57,9 @@ export class WidthManager {
     }
   }
 
+  /**
+   * Sets up a ResizeObserver on the workspace to trigger width updates when the window or sidebars are resized.
+   */
   setupResizeObserver(): void {
     this.cleanupResizeObserver();
     this.resizeObserver = new ResizeObserver(() => this.updateEditorWidthsDebounced());
@@ -57,6 +71,9 @@ export class WidthManager {
     }
   }
 
+  /**
+   * Iterates through all open leaves and applies their respective widths (global or local).
+   */
   updateEditorWidths(): void {
     this.iterateAllLeaves((leaf) => {
       const filePath = getFilePathForLeaf(leaf);

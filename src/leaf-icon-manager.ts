@@ -35,11 +35,16 @@ export class LeafIconManager {
     });
   }
 
+  /**
+   * Main logic for injecting the width control icon into all markdown tabs.
+   * Handles creation, display toggling, and cleanup of icons across multiple windows.
+   */
   injectAll(): void {
     const activeLeafIds = new Set<string>();
 
     this.iterateAllLeaves((leaf) => {
       const settings = this.getSettings();
+      // Only show the icon for markdown views
       const viewType = leaf.view?.getViewType();
       if (viewType !== 'markdown') return;
 
@@ -48,15 +53,18 @@ export class LeafIconManager {
 
       activeLeafIds.add(leafId);
       const ownerDoc = leaf.containerEl.ownerDocument;
+      // .view-actions is the standard Obsidian container for tab header icons (close, more, etc.)
       const actionsEl = leaf.view.containerEl.querySelector(
         '.view-actions'
       ) as HTMLElement | null;
       if (!actionsEl) return;
 
       const existing = this.leafIcons.get(leafId);
+      // Case 1: Icon already exists and is in the correct document
       if (existing && existing.isConnected && existing.ownerDocument === ownerDoc) {
         existing.style.display = settings.enableLineWidth ? 'flex' : 'none';
         this.refresh(leaf);
+        // Ensure the global click listener is registered for this document (handles popups in side windows)
         if (!this.docsWithClickListener.has(ownerDoc) && this.popupManager) {
           this.docsWithClickListener.add(ownerDoc);
           this.registerDomEvent(ownerDoc, 'click', (e) =>
@@ -65,7 +73,8 @@ export class LeafIconManager {
         }
         return;
       } else if (existing) {
-        // Clean up disconnected icon before recreating
+        // Case 2: Icon exists but is disconnected (e.g., tab was moved or UI refreshed)
+        // Cleanup old handler to prevent memory leaks before recreating
         const oldHandler = this.iconClickHandlers.get(leafId);
         if (oldHandler) {
           existing.removeEventListener('click', oldHandler);
@@ -74,6 +83,7 @@ export class LeafIconManager {
         this.iconClickHandlers.delete(leafId);
       }
 
+      // Case 3: Create a new icon
       if (!this.docsWithClickListener.has(ownerDoc) && this.popupManager) {
         this.docsWithClickListener.add(ownerDoc);
         this.registerDomEvent(ownerDoc, 'click', (e) =>
@@ -88,6 +98,7 @@ export class LeafIconManager {
       setIcon(iconSpan, 'chevrons-left-right-ellipsis');
       iconEl.appendChild(iconSpan);
 
+      // Prepend the icon to the start of the action buttons
       actionsEl.prepend(iconEl);
       this.leafIcons.set(leafId, iconEl);
 
@@ -96,13 +107,14 @@ export class LeafIconManager {
       this.refresh(leaf);
 
       const clickHandler = (e: MouseEvent): void => {
-        e.stopPropagation();
+        e.stopPropagation(); // Prevent Obsidian from handling the click on the tab header
         this.popupManager?.togglePopupForLeaf(leaf, iconEl);
       };
       iconEl.addEventListener('click', clickHandler);
       this.iconClickHandlers.set(leafId, clickHandler);
     });
 
+    // Cleanup phase: Remove icons for tabs that no longer exist
     const toDelete: string[] = [];
     this.leafIcons.forEach((el, id) => {
       if (!activeLeafIds.has(id)) {
@@ -125,6 +137,9 @@ export class LeafIconManager {
     });
   }
 
+  /**
+   * Refreshes the visual state of a specific leaf icon (e.g., updating the lock badge and tooltip).
+   */
   refresh(leaf: WorkspaceLeaf): void {
     const leafId = getLeafId(leaf);
     const iconEl = this.leafIcons.get(leafId);
@@ -134,6 +149,7 @@ export class LeafIconManager {
     const filePath = getFilePathForLeaf(leaf);
     const locked = isFileLocked(filePath, settings);
 
+    // Add or remove the small lock badge on the icon
     const existingBadge = iconEl.querySelector('.lw-lock-badge');
     if (locked && !existingBadge) {
       const b = iconEl.ownerDocument.createElement('span');
