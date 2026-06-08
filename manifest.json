@@ -1,7 +1,7 @@
 {
   "id": "editor-width",
   "name": "Editor Width",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.8.9",
   "description": "Modify the width of the editor with an action slider.",
   "author": "3C0D",
