@@ -21,34 +21,27 @@ export class WidthManager {
 
   applyWidthToLeaf(leaf: WorkspaceLeaf, px: number): void {
     const containerEl = leaf.containerEl as HTMLElement;
-    containerEl.querySelectorAll('.cm-sizer').forEach((el) => {
-      (el as HTMLElement).style.maxWidth = `${px}px`;
-    });
-    containerEl.querySelectorAll('.markdown-preview-sizer').forEach((el) => {
-      (el as HTMLElement).style.maxWidth = `${px}px`;
-      (el as HTMLElement).style.width = `${px}px`;
-    });
+    containerEl.style.setProperty('--editor-width', `${px}px`);
   }
 
   applyLineWidth(): void {
     const settings = this.getSettings();
     if (settings.enableLineWidth) {
       this.lineWidthStyleEl.textContent =
+        `.workspace-leaf { --editor-width: ${settings.lineWidthPx}px; }` +
         `.cm-contentContainer { max-width: unset !important; }` +
         `.cm-content { max-width: unset !important; }` +
-        `.cm-sizer { margin-left: auto !important; margin-right: auto !important; }` +
-        `.markdown-preview-view .markdown-preview-sizer { margin-left: auto !important; margin-right: auto !important; max-width: 100% !important; box-sizing: border-box !important; }` +
+        `.cm-sizer { margin-left: auto !important; margin-right: auto !important; max-width: var(--editor-width) !important; }` +
+        `.markdown-preview-view .markdown-preview-sizer { margin-left: auto !important; margin-right: auto !important; max-width: var(--editor-width) !important; width: var(--editor-width) !important; box-sizing: border-box !important; }` +
         `.markdown-preview-sizer .mermaid svg { max-width: 100% !important; height: auto !important; }`;
       this.setupResizeObserver();
       this.updateEditorWidths();
     } else {
       this.lineWidthStyleEl.textContent = '';
       this.cleanupResizeObserver();
-      this.getAllDocuments().forEach((doc) => {
-        doc.querySelectorAll('.cm-sizer, .markdown-preview-sizer').forEach((el) => {
-          (el as HTMLElement).style.removeProperty('max-width');
-          (el as HTMLElement).style.removeProperty('width');
-        });
+      this.iterateAllLeaves((leaf) => {
+        const containerEl = leaf.containerEl as HTMLElement;
+        containerEl.style.removeProperty('--editor-width');
       });
     }
   }
@@ -62,15 +55,6 @@ export class WidthManager {
     } else {
       console.warn('Workspace element not found for ResizeObserver');
     }
-  }
-
-  getAllDocuments(): Document[] {
-    const docs = new Set<Document>();
-    docs.add(document);
-    this.iterateAllLeaves((leaf) => {
-      docs.add(leaf.containerEl.ownerDocument);
-    });
-    return Array.from(docs);
   }
 
   updateEditorWidths(): void {

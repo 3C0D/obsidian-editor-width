@@ -52,8 +52,7 @@
     "prettier": "latest",
     "tslib": "2.4.0"
   },
-  "dependencies": {
-  },
+  "dependencies": {},
   "engines": {
     "npm": "please-use-yarn",
     "yarn": ">=1.22.0",

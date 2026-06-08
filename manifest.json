@@ -1,6 +1,6 @@
 {
   "id": "editor-width",
-  "name": "Obsidian Editor Width",
+  "name": "Editor Width",
   "version": "1.0.0",
   "minAppVersion": "1.8.9",
   "description": "Modify the width of the editor with an action slider.",

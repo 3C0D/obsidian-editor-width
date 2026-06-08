@@ -64,6 +64,14 @@ export class LeafIconManager {
           );
         }
         return;
+      } else if (existing) {
+        // Clean up disconnected icon before recreating
+        const oldHandler = this.iconClickHandlers.get(leafId);
+        if (oldHandler) {
+          existing.removeEventListener('click', oldHandler);
+        }
+        existing.remove();
+        this.iconClickHandlers.delete(leafId);
       }
 
       if (!this.docsWithClickListener.has(ownerDoc) && this.popupManager) {

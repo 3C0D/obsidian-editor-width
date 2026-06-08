@@ -69,6 +69,13 @@ export default class EditorWidthPlugin extends Plugin {
       })
     );
 
+    this.registerEvent(
+      this.app.workspace.on('active-leaf-change', () => {
+        this.widthManager.updateEditorWidths();
+        this.leafIconManager.injectAll();
+      })
+    );
+
     this.registerDomEvent(document, 'click', (e) =>
       this.popupManager.onDocumentClick(e, this.leafIconManager.getLeafIcons())
     );

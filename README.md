@@ -1,30 +1,47 @@
-# Obsidian Sample Plugin (Modified)
+# Obsidian Editor Width
 
-Self-contained Obsidian plugin with built-in development scripts and automated workflows.
-
-This plugin demonstrates the **obsidian-plugin-config** injection system, making it 100% standalone with all development tools integrated locally.
+Control and customize the width of your editor in Obsidian with precision. This plugin adds an intuitive width control interface directly in your markdown tabs.
 
 ## Features
 
-- ✅ **Standalone scripts** - All build and automation scripts included locally
-- ✅ **Hot reload** - Automatic rebuild on file changes
-- ✅ **Dual vault support** - Test and production vault configurations
-- ✅ **Git automation** - One-command commit and push
-- ✅ **Version management** - Automated version bumping
-- ✅ **GitHub releases** - Automated release creation
-- ✅ **Code quality** - ESLint + Prettier configured
-- ✅ **VSCode tasks** - Quick access to common commands
-- ✅ **SASS support** - Optional SCSS compilation
+- 📏 **Adjustable Editor Width** - Slider control to set custom width for your editor (300px - 1600px)
+- 🔒 **Per-File Width Locking** - Set different widths for individual files or use a global default
+- 🎯 **Visual Width Guides** - Vertical guides show exactly where your editor boundaries are
+- 🎨 **Customizable Colors** - Change the icon and guide colors to match your theme
+- ⌨️ **Cursor Preservation** - Optionally restore cursor position when closing the width control popup
+- 🔄 **Live Updates** - Real-time width adjustment with immediate visual feedback
+
+## Usage
+
+### Quick Start
+
+1. Open any Markdown file in Obsidian
+2. Look for the **width icon** (↔) in the markdown tab header
+3. Click the icon to open the width adjustment popup
+4. Use the slider to adjust your desired editor width
+5. Click the **lock icon** to save this width for the current file
+
+### Width Modes
+
+- **Global (unlock icon)** - Width applies to all files by default
+- **Local (lock icon)** - Width is saved only for this specific file
+
+### Settings
+
+Access plugin settings via **Settings → Editor Width**:
+
+- **Enable Line Width** - Toggle the width control feature
+- **Line Width Color** - Customize the color of width control icons
+- **Restore cursor on close** - Automatically restore cursor position when closing the popup
 
 ## Installation
 
-```bash
-git clone https://github.com/3C0D/obsidian-sample-plugin-modif.git
-cd obsidian-sample-plugin-modif
-yarn install
-```
+1. Open Obsidian Settings → Community plugins
+2. Search for "**Editor Width**"
+3. Click **Install**
+4. Enable the plugin in your plugin list
 
-## Configuration
+## Development
 
 ### Environment Setup
 

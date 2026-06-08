@@ -16,7 +16,11 @@ interface CursorState {
 }
 
 export class PopupManager {
-  private activePopup: { leafId: string; el: HTMLDivElement } | null = null;
+  private activePopup: {
+    leafId: string;
+    el: HTMLDivElement;
+    cleanup?: () => void;
+  } | null = null;
   private savedCursor: { leafId: string; state: CursorState } | null = null;
 
   constructor(
@@ -43,10 +47,11 @@ export class PopupManager {
   onDocumentClick(e: MouseEvent, leafIcons: Map<string, HTMLDivElement>): void {
     if (!this.activePopup) return;
     const clickDoc = (e.target as Node).ownerDocument;
-    const { leafId, el } = this.activePopup;
+    const { leafId, el, cleanup } = this.activePopup;
     const icon = leafIcons.get(leafId);
     if (!el.contains(e.target as Node) && !(icon && icon.contains(e.target as Node))) {
       el.remove();
+      if (cleanup) cleanup();
       this.activePopup = null;
       const leaf = this.findLeafById(leafId);
       if (
@@ -100,8 +105,7 @@ export class PopupManager {
     const existing =
       this.activePopup && this.activePopup.leafId === leafId ? this.activePopup.el : null;
     if (existing) {
-      existing.remove();
-      this.activePopup = null;
+      this.closePopupForLeaf(leafId);
     } else {
       this.showPopupForLeaf(leaf, iconEl);
     }
@@ -123,8 +127,7 @@ export class PopupManager {
     }
 
     if (this.activePopup && this.activePopup.leafId !== leafId) {
-      this.activePopup.el.remove();
-      this.activePopup = null;
+      this.closePopupForLeaf(this.activePopup.leafId);
     }
 
     const filePath = getFilePathForLeaf(leaf);
@@ -168,6 +171,22 @@ export class PopupManager {
       this.refreshLeafIcon(leaf);
     };
 
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closePopupForLeaf(leafId);
+        const leaf = this.findLeafById(leafId);
+        if (leaf) {
+          this.restoreCursor(leafId, leaf);
+        }
+      }
+    };
+    ownerDoc.addEventListener('keydown', onKeyDown);
+
+    const cleanup = (): void => {
+      ownerDoc.removeEventListener('keydown', onKeyDown);
+    };
+
     lockBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleLock(leaf, filePath, updateLockState);
@@ -203,12 +222,13 @@ export class PopupManager {
     popup.style.right = `${ownerWin.innerWidth - rect.right}px`;
 
     ownerDoc.body.appendChild(popup);
-    this.activePopup = { leafId, el: popup };
+    this.activePopup = { leafId, el: popup, cleanup };
   }
 
   closePopupForLeaf(leafId: string): void {
     if (this.activePopup?.leafId === leafId) {
       this.activePopup.el.remove();
+      if (this.activePopup.cleanup) this.activePopup.cleanup();
       this.activePopup = null;
     }
   }
