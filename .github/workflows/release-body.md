@@ -1,1 +1,1 @@
-"Readable line length" obsidian setting added to the modal
+Readable line length
