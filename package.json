@@ -1,6 +1,6 @@
 {
   "name": "editor-width",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Modify the width of the editor with an action slider.",
   "type": "module",
   "main": "src/main.ts",
