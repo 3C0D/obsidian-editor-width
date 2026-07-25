@@ -1,1 +1,1 @@
-Readable line length
+New feature: Mode detection with different settings for source mode(quick preview) and preview mode. lock or general avaible for each mode
