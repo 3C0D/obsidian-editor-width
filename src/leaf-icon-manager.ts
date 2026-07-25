@@ -4,6 +4,7 @@ import type { EditorWidthSettings } from './interfaces.ts';
 import {
   getLeafId,
   getFilePathForLeaf,
+  getModeForLeaf,
   isFileLocked,
   getTooltipForLeaf
 } from './leaf-utils.ts';
@@ -147,7 +148,8 @@ export class LeafIconManager {
 
     const settings = this.getSettings();
     const filePath = getFilePathForLeaf(leaf);
-    const locked = isFileLocked(filePath, settings);
+    const mode = getModeForLeaf(leaf);
+    const locked = isFileLocked(filePath, settings, mode);
 
     // Add or remove the small lock badge on the icon
     const existingBadge = iconEl.querySelector('.lw-lock-badge');

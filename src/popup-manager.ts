@@ -1,9 +1,10 @@
 import { MarkdownView, setIcon, ToggleComponent } from 'obsidian';
 import type { App, WorkspaceLeaf, EditorPosition, EventRef } from 'obsidian';
-import type { EditorWidthSettings } from './interfaces.ts';
+import type { EditorMode, EditorWidthSettings } from './interfaces.ts';
 import {
   getLeafId,
   getFilePathForLeaf,
+  getModeForLeaf,
   getWidthForLeafPath,
   isFileLocked
 } from './leaf-utils.ts';
@@ -88,18 +89,24 @@ export class PopupManager {
   private toggleLock(
     leaf: WorkspaceLeaf,
     filePath: string | null,
+    mode: EditorMode,
     updateLockState: () => void
   ): void {
     if (!filePath) return;
     const s = this.getSettings();
-    if (isFileLocked(filePath, s)) {
+    const localWidths = mode === 'preview' ? s.localWidthsPreview : s.localWidths;
+    // In preview mode, the global width falls back to lineWidthPx as long as
+    // lineWidthPxPreview has never been touched by the user.
+    const globalWidth =
+      mode === 'preview' ? (s.lineWidthPxPreview ?? s.lineWidthPx) : s.lineWidthPx;
+    if (isFileLocked(filePath, s, mode)) {
       // Unlock: Remove the local override and revert to global width
-      delete s.localWidths[filePath];
+      delete localWidths[filePath];
       void this.saveData(s);
-      this.widthManager.applyWidthToLeaf(leaf, s.lineWidthPx);
+      this.widthManager.applyWidthToLeaf(leaf, globalWidth);
     } else {
       // Lock: Create a local override starting with the current global width
-      s.localWidths[filePath] = s.lineWidthPx;
+      localWidths[filePath] = globalWidth;
       void this.saveData(s);
     }
     updateLockState();
@@ -154,6 +161,9 @@ export class PopupManager {
     }
 
     const filePath = getFilePathForLeaf(leaf);
+    // Mode is captured once when the popup opens; the popup always edits the
+    // width settings for the mode the leaf was in at that moment.
+    const mode = getModeForLeaf(leaf);
     const ownerDoc = iconEl.ownerDocument;
     const ownerWin = ownerDoc.defaultView;
     if (!ownerWin) return;
@@ -182,11 +192,11 @@ export class PopupManager {
      */
     const updateLockState = (): void => {
       const settings = this.getSettings();
-      const width = getWidthForLeafPath(filePath, settings);
+      const width = getWidthForLeafPath(filePath, settings, mode);
       label.textContent = `${width}px`;
       slider.value = `${width}`;
       lockBtn.innerHTML = '';
-      if (isFileLocked(filePath, settings)) {
+      if (isFileLocked(filePath, settings, mode)) {
         setIcon(lockBtn, 'lock');
         lockBtn.style.color = 'var(--interactive-accent)';
         lockBtn.setAttribute('aria-label', 'Local width (this file only)');
@@ -220,20 +230,25 @@ export class PopupManager {
 
     lockBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.toggleLock(leaf, filePath, updateLockState);
+      this.toggleLock(leaf, filePath, mode, updateLockState);
     });
 
     slider.addEventListener('input', () => {
       const value = parseInt(slider.value, 10);
       label.textContent = `${value}px`;
       const s = this.getSettings();
-      if (isFileLocked(filePath, s)) {
-        // Update local width only
-        if (filePath) s.localWidths[filePath] = value;
+      if (isFileLocked(filePath, s, mode)) {
+        // Update local width only, for this mode
+        if (filePath) {
+          if (mode === 'preview') s.localWidthsPreview[filePath] = value;
+          else s.localWidths[filePath] = value;
+        }
         this.widthManager.applyWidthToLeaf(leaf, value);
       } else {
-        // Update global width
-        s.lineWidthPx = value;
+        // Update global width for this mode. Touching the preview slider detaches
+        // it from lineWidthPx, so from now on it changes independently.
+        if (mode === 'preview') s.lineWidthPxPreview = value;
+        else s.lineWidthPx = value;
         this.widthManager.applyLineWidth();
       }
       this.saveDebounced();
@@ -242,40 +257,44 @@ export class PopupManager {
       this.guides.scheduleHide(2000);
     });
 
-    // Create the readable line length toggle row (reuses existing flex-row classes, no new CSS needed)
-    const readableRow = ownerDoc.createElement('div');
-    readableRow.classList.add('line-width-slider-header');
-
-    const readableLabel = ownerDoc.createElement('span');
-    readableLabel.classList.add('line-width-slider-label');
-    readableLabel.textContent = 'Readable line length';
-    readableLabel.setAttribute(
-      'aria-label',
-      'Toggle Obsidian\'s built-in "Readable line length" setting'
-    );
-
-    const toggleWrapper = ownerDoc.createElement('div');
-
-    const readableToggle = new ToggleComponent(toggleWrapper)
-      .setValue(Boolean(this.app.vault.getConfig('readableLineLength')))
-      .onChange((checked) => {
-        this.app.vault.setConfig('readableLineLength', checked);
-        // Trigger css-change so Obsidian re-applies the setting to all editors
-        this.app.workspace.trigger('css-change');
-      });
-
-    // Keep the toggle in sync if the user changes the setting from Obsidian's own settings panel
-    cssChangeRef = this.app.workspace.on('css-change', () => {
-      readableToggle.setValue(Boolean(this.app.vault.getConfig('readableLineLength')));
-    });
-
     headerRow.appendChild(label);
     headerRow.appendChild(lockBtn);
     popup.appendChild(headerRow);
     popup.appendChild(slider);
-    popup.appendChild(readableRow);
-    readableRow.appendChild(readableLabel);
-    readableRow.appendChild(toggleWrapper);
+
+    // "Readable line length" is an Obsidian editor-only setting, it has no effect in
+    // Reading view, so the toggle is only shown in source mode.
+    if (mode === 'source') {
+      const readableRow = ownerDoc.createElement('div');
+      readableRow.classList.add('line-width-slider-header');
+
+      const readableLabel = ownerDoc.createElement('span');
+      readableLabel.classList.add('line-width-slider-label');
+      readableLabel.textContent = 'Readable line length';
+      readableLabel.setAttribute(
+        'aria-label',
+        'Toggle Obsidian\'s built-in "Readable line length" setting'
+      );
+
+      const toggleWrapper = ownerDoc.createElement('div');
+
+      const readableToggle = new ToggleComponent(toggleWrapper)
+        .setValue(Boolean(this.app.vault.getConfig('readableLineLength')))
+        .onChange((checked) => {
+          this.app.vault.setConfig('readableLineLength', checked);
+          // Trigger css-change so Obsidian re-applies the setting to all editors
+          this.app.workspace.trigger('css-change');
+        });
+
+      // Keep the toggle in sync if the user changes the setting from Obsidian's own settings panel
+      cssChangeRef = this.app.workspace.on('css-change', () => {
+        readableToggle.setValue(Boolean(this.app.vault.getConfig('readableLineLength')));
+      });
+
+      popup.appendChild(readableRow);
+      readableRow.appendChild(readableLabel);
+      readableRow.appendChild(toggleWrapper);
+    }
 
     updateLockState();
 

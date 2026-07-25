@@ -1,6 +1,6 @@
 import { MarkdownView } from 'obsidian';
 import type { WorkspaceLeaf, FileView } from 'obsidian';
-import type { EditorWidthSettings } from './interfaces.ts';
+import type { EditorMode, EditorWidthSettings } from './interfaces.ts';
 
 export function getLeafId(leaf: WorkspaceLeaf): string {
   return leaf.id ?? '';
@@ -18,38 +18,64 @@ export function getFilePathForLeaf(leaf: WorkspaceLeaf): string | null {
 }
 
 /**
- * Determines the effective width for a file path.
- * Returns the local override if it exists, otherwise the global default.
+ * Determines whether a leaf is currently in source (edit) or preview (reading) mode.
+ * Uses MarkdownView.getMode(), never CSS class presence, since Obsidian's internal
+ * class names are not part of the public API and may change without notice.
+ * Non-Markdown views are treated as source mode since the distinction doesn't apply to them.
+ */
+export function getModeForLeaf(leaf: WorkspaceLeaf): EditorMode {
+  if (leaf.view instanceof MarkdownView) {
+    return leaf.view.getMode() === 'preview' ? 'preview' : 'source';
+  }
+  return 'source';
+}
+
+/**
+ * Determines the effective width for a file path in a given mode.
+ * Returns the local override if it exists, otherwise the global default for that mode.
+ * In preview mode, a global default of null falls back to the edit mode's global width.
  */
 export function getWidthForLeafPath(
   filePath: string | null,
-  settings: EditorWidthSettings
+  settings: EditorWidthSettings,
+  mode: EditorMode = 'source'
 ): number {
-  if (filePath && settings.localWidths[filePath] !== undefined) {
-    return settings.localWidths[filePath];
+  const localWidths =
+    mode === 'preview' ? settings.localWidthsPreview : settings.localWidths;
+  if (filePath && localWidths[filePath] !== undefined) {
+    return localWidths[filePath];
+  }
+  if (mode === 'preview') {
+    return settings.lineWidthPxPreview ?? settings.lineWidthPx;
   }
   return settings.lineWidthPx;
 }
 
 /**
- * Checks if a file has a "Local Width" (locked) override.
+ * Checks if a file has a "Local Width" (locked) override for a given mode.
  */
 export function isFileLocked(
   filePath: string | null,
-  settings: EditorWidthSettings
+  settings: EditorWidthSettings,
+  mode: EditorMode = 'source'
 ): boolean {
-  return filePath !== null && settings.localWidths[filePath] !== undefined;
+  const localWidths =
+    mode === 'preview' ? settings.localWidthsPreview : settings.localWidths;
+  return filePath !== null && localWidths[filePath] !== undefined;
 }
 
 /**
  * Generates the tooltip text for the width control icon.
+ * Reflects the width and lock state for the leaf's current mode (source or preview).
  */
 export function getTooltipForLeaf(
   leaf: WorkspaceLeaf,
   settings: EditorWidthSettings
 ): string {
   const filePath = getFilePathForLeaf(leaf);
-  const width = getWidthForLeafPath(filePath, settings);
-  const locked = isFileLocked(filePath, settings);
-  return `Editor width: ${width}px${locked ? ' (local)' : ' (global)'}`;
+  const mode = getModeForLeaf(leaf);
+  const width = getWidthForLeafPath(filePath, settings, mode);
+  const locked = isFileLocked(filePath, settings, mode);
+  const modeLabel = mode === 'preview' ? ' [preview]' : '';
+  return `Editor width: ${width}px${locked ? ' (local)' : ' (global)'}${modeLabel}`;
 }

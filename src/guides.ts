@@ -1,4 +1,6 @@
 import type { WorkspaceLeaf } from 'obsidian';
+import type { EditorMode } from './interfaces.ts';
+import { getModeForLeaf } from './leaf-utils.ts';
 
 export class WidthGuides {
   leftGuide: HTMLDivElement | null = null;
@@ -6,7 +8,7 @@ export class WidthGuides {
   guideTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
-    private getWidthForLeafPath: (filePath: string | null) => number,
+    private getWidthForLeafPath: (filePath: string | null, mode: EditorMode) => number,
     private getFilePathForLeaf: (leaf: WorkspaceLeaf) => string | null
   ) {}
 
@@ -19,14 +21,19 @@ export class WidthGuides {
 
     const ownerDoc = leaf.containerEl.ownerDocument;
     const filePath = this.getFilePathForLeaf(leaf);
-    const px = this.getWidthForLeafPath(filePath);
+    const mode = getModeForLeaf(leaf);
+    const px = this.getWidthForLeafPath(filePath, mode);
     const containerEl = leaf.containerEl as HTMLElement;
 
-    // Handle Reading View
-    const readingContainer = containerEl.querySelector(
-      '.markdown-reading-view'
-    ) as HTMLElement | null;
-    if (readingContainer && readingContainer.offsetParent !== null) {
+    // Handle Reading View. The branch is chosen via getModeForLeaf() (MarkdownView.getMode()),
+    // not by testing for the presence of the .markdown-reading-view class: Obsidian's internal
+    // class names are not part of the public API and may change. The class selector below is
+    // only used to locate the DOM node to measure, once the mode is already known.
+    if (mode === 'preview') {
+      const readingContainer = containerEl.querySelector(
+        '.markdown-reading-view'
+      ) as HTMLElement | null;
+      if (!readingContainer || readingContainer.offsetParent === null) return;
       const rect = readingContainer.getBoundingClientRect();
       if (rect.width === 0) return;
       const offsetX = Math.max(0, (rect.width - px) / 2);

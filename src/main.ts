@@ -45,7 +45,7 @@ export default class EditorWidthPlugin extends Plugin {
     this.widthManager.applyLineWidth();
 
     this.guides = new WidthGuides(
-      (filePath) => getWidthForLeafPath(filePath, this.settings),
+      (filePath, mode) => getWidthForLeafPath(filePath, this.settings, mode),
       (leaf) => getFilePathForLeaf(leaf)
     );
 
@@ -111,6 +111,7 @@ export default class EditorWidthPlugin extends Plugin {
       ...(await this.loadData())
     };
     if (!this.settings.localWidths) this.settings.localWidths = {};
+    if (!this.settings.localWidthsPreview) this.settings.localWidthsPreview = {};
   }
 
   /**

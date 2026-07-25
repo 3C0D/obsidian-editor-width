@@ -1,7 +1,7 @@
 import { debounce } from 'obsidian';
 import type { WorkspaceLeaf } from 'obsidian';
 import type { EditorWidthSettings } from './interfaces.ts';
-import { getFilePathForLeaf, getWidthForLeafPath } from './leaf-utils.ts';
+import { getFilePathForLeaf, getModeForLeaf, getWidthForLeafPath } from './leaf-utils.ts';
 
 export class WidthManager {
   private resizeObserver: ResizeObserver | null = null;
@@ -77,7 +77,8 @@ export class WidthManager {
   updateEditorWidths(): void {
     this.iterateAllLeaves((leaf) => {
       const filePath = getFilePathForLeaf(leaf);
-      const px = getWidthForLeafPath(filePath, this.getSettings());
+      const mode = getModeForLeaf(leaf);
+      const px = getWidthForLeafPath(filePath, this.getSettings(), mode);
       this.applyWidthToLeaf(leaf, px);
     });
   }
